@@ -1,0 +1,234 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useSession, signOut } from 'next-auth/react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+
+export default function Home() {
+  const { data: session } = useSession();
+  const [tableData, setTableData] = useState([]);
+  const [headers, setHeaders] = useState([]);
+  const [fileName, setFileName] = useState('');
+  const [mounted, setMounted] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState('');
+  const [insights, setInsights] = useState(null);
+  const [chartData, setChartData] = useState([]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setFileName(file.name);
+    setInsights(null);
+    setChartData([]);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      const rows = text.trim().split('\n');
+      const parsedHeaders = rows[0].split(',');
+      const parsedData = rows.slice(1).map((row) => row.split(','));
+      setHeaders(parsedHeaders);
+      setTableData(parsedData);
+      const parsed = parsedData.map((row) => {
+        const obj = {};
+        parsedHeaders.forEach((h, i) => {
+          obj[h.trim()] = isNaN(row[i]) ? row[i] : parseFloat(row[i]);
+        });
+        return obj;
+      });
+      setChartData(parsed);
+    };
+    reader.readAsText(file);
+
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      setUploadStatus('Uploading...');
+      const response = await fetch('http://localhost:5000/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json();
+      setUploadStatus(`✅ Server received: ${data.upload.originalname}`);
+    } catch (error) {
+      setUploadStatus('❌ Could not reach backend');
+    }
+
+    try {
+      const formData2 = new FormData();
+      formData2.append('file', file);
+      const analysisResponse = await fetch('http://localhost:5000/api/analyze', {
+        method: 'POST',
+        body: formData2,
+      });
+      const text = await analysisResponse.text();
+      const analysisData = JSON.parse(text);
+      setInsights(analysisData);
+    } catch (error) {
+      console.error('Analysis error:', error);
+    }
+  };
+
+  if (!mounted) return null;
+
+  if (!session) {
+    return (
+      <main className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-700 mb-4">Please sign in to continue</h1>
+          <a href="/login" className="bg-blue-600 text-white px-6 py-3 rounded-lg">Go to Login</a>
+        </div>
+      </main>
+    );
+  }
+
+  const numericHeaders = headers.filter((h) =>
+    tableData.length > 0 && !isNaN(parseFloat(tableData[0][headers.indexOf(h)]))
+  );
+
+  const stringHeader = headers.find((h) =>
+    tableData.length > 0 && isNaN(parseFloat(tableData[0][headers.indexOf(h)]))
+  );
+
+  return (
+    <main className="min-h-screen bg-gray-100 p-8">
+
+      {/* Header with user info */}
+      <div className="flex justify-between items-center max-w-4xl mx-auto mb-8">
+        <h1 className="text-3xl font-bold text-blue-600">Data Analytics Platform</h1>
+        <div className="flex items-center gap-4">
+          <img src={session.user.image} className="w-8 h-8 rounded-full" alt="avatar" />
+          <span className="text-sm text-gray-600">{session.user.name}</span>
+          <button
+            onClick={() => signOut()}
+            className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-600"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+
+      {/* Upload Box */}
+      <div className="bg-white rounded-xl shadow p-6 max-w-xl mx-auto mb-8">
+        <h2 className="text-lg font-semibold mb-4 text-gray-700">Upload CSV File</h2>
+        <input
+          type="file"
+          accept=".csv"
+          onChange={handleFileUpload}
+          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+        />
+        {fileName && <p className="mt-3 text-sm text-green-600">✅ Loaded: {fileName}</p>}
+        {uploadStatus && <p className="mt-2 text-sm text-blue-600">{uploadStatus}</p>}
+      </div>
+
+      {/* Insights */}
+      {insights && (
+        <div className="bg-white rounded-xl shadow p-6 max-w-4xl mx-auto mb-8">
+          <h2 className="text-lg font-semibold mb-4 text-gray-700">📊 Data Insights</h2>
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="bg-blue-50 rounded-lg p-4 text-center">
+              <p className="text-3xl font-bold text-blue-600">{insights.rows}</p>
+              <p className="text-sm text-gray-600">Total Rows</p>
+            </div>
+            <div className="bg-green-50 rounded-lg p-4 text-center">
+              <p className="text-3xl font-bold text-green-600">{insights.columns}</p>
+              <p className="text-sm text-gray-600">Total Columns</p>
+            </div>
+          </div>
+          {Object.keys(insights.numeric_summary).length > 0 && (
+            <div>
+              <h3 className="font-semibold text-gray-700 mb-3">📈 Numeric Summary</h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm text-left">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-4 py-2">Column</th>
+                      <th className="px-4 py-2">Min</th>
+                      <th className="px-4 py-2">Max</th>
+                      <th className="px-4 py-2">Mean</th>
+                      <th className="px-4 py-2">Median</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(insights.numeric_summary).map(([col, stats]) => (
+                      <tr key={col} className="border-b">
+                        <td className="px-4 py-2 font-medium">{col}</td>
+                        <td className="px-4 py-2">{stats.min}</td>
+                        <td className="px-4 py-2">{stats.max}</td>
+                        <td className="px-4 py-2">{stats.mean}</td>
+                        <td className="px-4 py-2">{stats.median}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Charts */}
+      {chartData.length > 0 && numericHeaders.length > 0 && (
+        <div className="bg-white rounded-xl shadow p-6 max-w-4xl mx-auto mb-8">
+          <h2 className="text-lg font-semibold mb-6 text-gray-700">📊 Charts</h2>
+          <div className="mb-8">
+            <h3 className="text-md font-semibold text-gray-600 mb-4">Bar Chart — {numericHeaders[0]}</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey={stringHeader || headers[0]} />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey={numericHeaders[0]} fill="#3b82f6" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          {numericHeaders.length > 1 && (
+            <div>
+              <h3 className="text-md font-semibold text-gray-600 mb-4">Line Chart — {numericHeaders[1]}</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey={stringHeader || headers[0]} />
+                  <YAxis />
+                  <Tooltip />
+                  <Line type="monotone" dataKey={numericHeaders[1]} stroke="#10b981" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Table */}
+      {tableData.length > 0 && (
+        <div className="bg-white rounded-xl shadow p-6 overflow-x-auto max-w-4xl mx-auto">
+          <h2 className="text-lg font-semibold mb-4 text-gray-700">📋 CSV Data</h2>
+          <table className="min-w-full text-sm text-left">
+            <thead className="bg-blue-600 text-white">
+              <tr>
+                {headers.map((header, i) => (
+                  <th key={i} className="px-4 py-2">{header}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {tableData.map((row, i) => (
+                <tr key={i} className={i % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                  {row.map((cell, j) => (
+                    <td key={j} className="px-4 py-2 border-b">{cell}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </main>
+  );
+}
