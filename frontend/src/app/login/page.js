@@ -1,19 +1,8 @@
 'use client';
 
-import { signIn, useSession } from 'next-auth/react';
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 
 export default function Login() {
-  const { data: session } = useSession();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (session) {
-      router.push('/');
-    }
-  }, [session, router]);
-
   return (
     <main className="min-h-screen bg-gray-100 flex items-center justify-center">
       <div className="bg-white rounded-xl shadow p-8 max-w-md w-full text-center">
@@ -21,7 +10,7 @@ export default function Login() {
         <p className="text-gray-500 mb-8">Sign in to upload and analyze your data</p>
 
         <button
-          onClick={() => signIn('google')}
+          onClick={() => signIn('google', { callbackUrl: 'http://localhost:3000' })}
           className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 rounded-lg px-6 py-3 text-gray-700 font-medium hover:bg-gray-50 shadow-sm transition mb-4"
         >
           <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />

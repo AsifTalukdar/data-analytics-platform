@@ -181,11 +181,11 @@ data-analytics-platform/
 
 ## 📝 Notes
 
-- All CSV files are stored in `/backend/uploads/` with timestamp prefixes
-- Database connection requires PostgreSQL running locally
-- CORS is enabled for frontend-backend communication
-- Session tokens are managed via NextAuth
-- Python service provides enhanced data analysis capabilities
+  #  - All CSV files are stored in  `/backend/uploads/` with timestamp prefixes
+   # - Database connection requires PostgreSQL running locally
+   # - CORS is enabled for frontend-backend communication
+   # - Session tokens are managed via NextAuth
+   # - Python service provides enhanced data analysis capabilities
 
 ## 🚦 Running the Application
 
