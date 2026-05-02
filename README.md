@@ -1,102 +1,341 @@
 # Data Analytics Platform
 
-A full-stack web application for uploading, analyzing, and visualizing CSV data with Google authentication.
+A full-stack web application for CSV data analysis, visualization, and reporting. Upload CSV files, analyze data statistics, visualize trends with interactive charts, and export reports to PDF.
 
-## 📋 Project Overview
+## 🎯 Features
 
-This is a data analytics platform where users can:
-- **Authenticate** using Google OAuth
-- **Upload CSV files** securely
-- **Analyze data** with automatic statistical calculations
-- **Visualize data** with interactive charts and tables
-- **View insights** including min, max, mean, and median values for numeric columns
+- **File Upload & Management**: Upload CSV files and manage your data uploads
+- **Data Analysis**: Automatic statistical analysis including mean, median, min, max for numeric columns
+- **Interactive Visualizations**: Real-time charts and graphs using Recharts
+- **PDF Export**: Generate and download analysis reports in PDF format
+- **Google OAuth Authentication**: Secure login using Google accounts
+- **Responsive Design**: Works seamlessly on desktop and mobile devices
+- **Docker Support**: Easy deployment with Docker and Docker Compose
 
 ## 🏗️ Architecture
 
-### **Frontend (Next.js + React)**
-- **Location**: `/frontend`
-- **Tech Stack**: 
-  - Next.js 16.2.4
-  - React 19.2.4
-  - Tailwind CSS 4
-  - Recharts (for charts)
-  - NextAuth 4.24.14 (Google OAuth)
-  - Babel React Compiler
+### Tech Stack
 
-**Key Features:**
-- Login page with Google authentication
-- Main dashboard for file uploads
-- CSV preview in table format
-- Interactive bar and line charts for data visualization
-- Real-time data analysis display
-- Session management with NextAuth
+**Frontend:**
+- Next.js 16.2.4 (React 19)
+- Tailwind CSS + PostCSS
+- Recharts (data visualization)
+- jsPDF & jsPDF-autotable (PDF generation)
+- NextAuth.js (Google OAuth authentication)
 
-### **Backend (Express.js + PostgreSQL)**
-- **Location**: `/backend`
-- **Tech Stack**:
-  - Express.js 5.2.1
-  - PostgreSQL (pg)
-  - Multer (file upload handling)
-  - CORS enabled
-  - Dotenv (environment variables)
+**Backend:**
+- Express.js (REST API)
+- PostgreSQL (database)
+- Multer (file uploads)
+- Python Flask Service (advanced data analysis)
+- Axios (HTTP client)
 
-**API Endpoints:**
-1. `GET /` - Health check
-2. `POST /api/upload` - Upload CSV file to database
-   - Saves file metadata (filename, size) to PostgreSQL
-   - Stores file in `/uploads` directory
-3. `GET /api/uploads` - Retrieve all uploaded files
-4. `POST /api/analyze` - Analyze CSV file
-   - Parses CSV headers and data
-   - Calculates min, max, mean, median for numeric columns
-   - Returns statistics
+**Infrastructure:**
+- Docker & Docker Compose
+- Nginx (reverse proxy)
+- PostgreSQL 15
 
-**Database Connection:**
-- PostgreSQL database: `analytics_db`
-- User: postgres
-- Host: localhost
-- Port: 5432
+### Project Structure
 
-### **Python Analytics Service**
-- **Location**: `/backend/python-service`
-- **Tech Stack**:
-  - Flask
-  - Pandas
-  - CORS enabled
+```
+.
+├── frontend/                 # Next.js frontend application
+│   ├── src/
+│   │   └── app/
+│   │       ├── page.js      # Main dashboard
+│   │       ├── layout.js    # Layout wrapper
+│   │       ├── providers.js # Auth providers
+│   │       ├── globals.css  # Global styles
+│   │       ├── login/       # Login page
+│   │       └── api/auth/    # NextAuth routes
+│   ├── package.json
+│   ├── next.config.mjs
+│   └── Dockerfile
+│
+├── backend/                  # Express.js API server
+│   ├── index.js             # Main server file
+│   ├── package.json
+│   ├── Dockerfile
+│   ├── python-service/      # Flask analysis service
+│   │   └── analyze.py
+│   └── uploads/             # Uploaded files directory
+│
+├── nginx/                    # Nginx configuration
+│   └── nginx.conf
+│
+├── docker-compose.yml       # Multi-container orchestration
+└── README.md
 
-**Endpoint:**
-- `POST /analyze` - Advanced data analysis
-  - Uses pandas for efficient data processing
-  - Returns: row count, column count, column info, numeric summary, and data preview
-  - Runs on port 6000
-
-### **File Upload Storage**
-- **Location**: `/backend/uploads`
-- Contains 30+ CSV files uploaded during testing/development
-- Files named with timestamp + original filename (e.g., `1777366061898-sample.csv`)
+```
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js
-- PostgreSQL
-- Python 3.x
 
-### Setup Frontend
+- Docker & Docker Compose (recommended)
+- Node.js 18+ and npm (for local development)
+- PostgreSQL 15+ (if running without Docker)
+- Google OAuth credentials (for authentication)
+
+### Installation & Setup
+
+#### Using Docker Compose (Recommended)
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/AsifTalukdar/data-analytics-platform.git
+   cd data-analytics-platform
+   ```
+
+2. **Set up environment variables**
+   Create a `.env` file in the root directory:
+   ```env
+   NEXTAUTH_SECRET=your_secret_key_here
+   NEXTAUTH_URL=http://localhost
+   GOOGLE_CLIENT_ID=your_google_client_id
+   GOOGLE_CLIENT_SECRET=your_google_client_secret
+   
+   DB_USER=postgres
+   DB_PASSWORD=postgres
+   DB_NAME=analytics_db
+   DB_HOST=db
+   DB_PORT=5432
+   ```
+
+3. **Start all services**
+   ```bash
+   docker-compose up --build
+   ```
+
+   Services will be available at:
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:5000
+   - Database: localhost:5432
+   - Nginx: http://localhost:80
+
+#### Local Development
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/AsifTalukdar/data-analytics-platform.git
+   cd data-analytics-platform
+   ```
+
+2. **Frontend Setup**
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   # Runs on http://localhost:3000
+   ```
+
+3. **Backend Setup**
+   ```bash
+   cd backend
+   npm install
+   node index.js
+   # Runs on http://localhost:5000
+   ```
+
+4. **PostgreSQL Setup**
+   - Ensure PostgreSQL is running on localhost:5432
+   - Create database `analytics_db`
+   - Database tables will be auto-created if needed
+
+## 📖 API Documentation
+
+### Upload File
+- **Endpoint**: `POST /api/upload`
+- **Body**: FormData with file field
+- **Response**: `{ message: string, upload: object }`
+
+### Get Uploads
+- **Endpoint**: `GET /api/uploads`
+- **Response**: Array of upload records
+
+### Analyze CSV
+- **Endpoint**: `POST /api/analyze`
+- **Body**: FormData with file field
+- **Response**: Statistical analysis with numeric summary
+
+```json
+{
+  "rows": 1000,
+  "columns": 5,
+  "numeric_summary": {
+    "column_name": {
+      "min": 0,
+      "max": 100,
+      "mean": 50.5,
+      "median": 50
+    }
+  }
+}
+```
+
+## 🔐 Google OAuth Setup
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project
+3. Enable Google+ API
+4. Create OAuth 2.0 credentials (Web application)
+5. Add authorized redirect URIs:
+   - `http://localhost:3000/api/auth/callback/google`
+   - `http://your-domain.com/api/auth/callback/google`
+6. Copy Client ID and Client Secret to your `.env` file
+
+## 🛠️ Development
+
+### Build Frontend
 ```bash
 cd frontend
-npm install
-npm run dev
-# Frontend runs on http://localhost:3000
+npm run build
+npm start
 ```
 
-### Setup Backend
+### Lint Code
 ```bash
-cd backend
-npm install
-node index.js
-# Backend runs on http://localhost:5000
+cd frontend
+npm run lint
 ```
+
+### Access Database
+```bash
+psql -U postgres -d analytics_db -h localhost
+```
+
+## 📊 Features Breakdown
+
+### CSV Upload
+- Users can upload CSV files from the dashboard
+- Files are stored in `backend/uploads/` and database records maintained
+- Supports large files (shows warning for files > 5MB)
+
+### Data Analysis
+- Automatic parsing of CSV structure
+- Numeric column detection and statistical calculation
+- Min, max, mean, median calculations
+- Support for quoted fields and complex CSV formats
+
+### Visualization
+- Bar charts for categorical comparisons
+- Line charts for trend analysis
+- Interactive Recharts components
+- First 20 rows used for chart generation
+
+### PDF Export
+- Generate professional PDF reports
+- Include tables and insights
+- Auto-generated headers and footers
+
+### Authentication
+- Google OAuth 2.0 integration
+- NextAuth.js session management
+- Protected API endpoints
+
+## 🐳 Docker Commands
+
+```bash
+# Build all services
+docker-compose build
+
+# Start services in background
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+
+# Remove volumes (WARNING: deletes data)
+docker-compose down -v
+```
+
+## 🗄️ Database Schema
+
+### uploads table
+```sql
+CREATE TABLE uploads (
+  id SERIAL PRIMARY KEY,
+  filename VARCHAR(255),
+  originalname VARCHAR(255),
+  size INTEGER,
+  uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+## 📝 Environment Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `NEXTAUTH_SECRET` | Secret for NextAuth.js session encryption | `your-secret-key-here` |
+| `NEXTAUTH_URL` | Base URL for authentication | `http://localhost` |
+| `GOOGLE_CLIENT_ID` | Google OAuth Client ID | From Google Cloud Console |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret | From Google Cloud Console |
+| `DB_USER` | PostgreSQL username | `postgres` |
+| `DB_PASSWORD` | PostgreSQL password | `postgres` |
+| `DB_NAME` | PostgreSQL database name | `analytics_db` |
+| `DB_HOST` | PostgreSQL host | `db` (Docker) or `localhost` |
+| `DB_PORT` | PostgreSQL port | `5432` |
+
+## 🚨 Troubleshooting
+
+### Backend cannot connect to database
+- Ensure PostgreSQL is running
+- Check database credentials in `.env`
+- Verify database exists: `createdb analytics_db`
+
+### Frontend cannot reach backend
+- Ensure backend is running on port 5000
+- Check CORS settings in Express app
+- Verify firewall rules
+
+### Google OAuth not working
+- Verify credentials in `.env` file
+- Check authorized redirect URIs in Google Cloud Console
+- Ensure NEXTAUTH_URL matches your domain
+
+### Large file uploads failing
+- Increase Express payload limit in backend
+- Check disk space for uploads directory
+- Consider chunked upload for very large files
+
+## 📈 Future Enhancements
+
+- [ ] Advanced data filtering and sorting
+- [ ] Data export to Excel, JSON formats
+- [ ] Scheduled analysis reports
+- [ ] Data validation rules
+- [ ] User collaboration features
+- [ ] Advanced statistical models
+- [ ] Real-time data streaming support
+
+## 📄 License
+
+This project is licensed under the ISC License.
+
+## 👤 Author
+
+**Asif Talukdar**
+
+## 🤝 Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📞 Support
+
+For issues and questions, please open an issue on GitHub.
+
+---
+
+**Last Updated**: May 3, 2026
 
 ### Setup Python Service
 ```bash
