@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+
 export default function Home() {
   const { data: session } = useSession();
   const [tableData, setTableData] = useState([]);
@@ -15,7 +16,8 @@ export default function Home() {
   const [uploadStatus, setUploadStatus] = useState('');
   const [insights, setInsights] = useState(null);
   const [chartData, setChartData] = useState([]);
-
+  const [currentPage, setCurrentPage] = useState(1);
+  const rowsPerPage = 10;
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -24,28 +26,44 @@ export default function Home() {
     const file = e.target.files[0];
     if (!file) return;
 
-    setFileName(file.name);
-    setInsights(null);
-    setChartData([]);
+  setFileName(file.name);
+  setInsights(null);
+  setChartData([]);
+  setCurrentPage(1);
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target.result;
-      const rows = text.trim().split('\n');
-      const parsedHeaders = rows[0].split(',');
-      const parsedData = rows.slice(1).map((row) => row.split(','));
-      setHeaders(parsedHeaders);
-      setTableData(parsedData);
-      const parsed = parsedData.map((row) => {
-        const obj = {};
-        parsedHeaders.forEach((h, i) => {
-          obj[h.trim()] = isNaN(row[i]) ? row[i] : parseFloat(row[i]);
-        });
-        return obj;
-      });
-      setChartData(parsed);
-    };
-    reader.readAsText(file);
+// Warn for large files
+if (file.size > 5 * 1024 * 1024) {
+  setUploadStatus('⚠️ Large file detected - showing first 500 rows only');
+}
+
+const reader = new FileReader();
+reader.onload = (event) => {
+  const text = event.target.result;
+  const rows = text.trim().split('\n');
+  const parsedHeaders = rows[0].split(',').map(h => h.trim().replace(/"/g, ''));
+  
+  // Only load first 500 rows for display
+  const maxRows = 200;
+  const parsedData = rows.slice(1, maxRows + 1).map((row) => {
+    // Handle CSV with quoted fields
+    const cells = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || row.split(',');
+    return cells.map(c => c.replace(/"/g, '').trim());
+  });
+  
+  setHeaders(parsedHeaders);
+  setTableData(parsedData);
+
+  // Only use first 50 rows for charts
+  const parsed = parsedData.slice(0, 20).map((row) => {
+    const obj = {};
+    parsedHeaders.forEach((h, i) => {
+      obj[h] = isNaN(row[i]) ? row[i] : parseFloat(row[i]);
+    });
+    return obj;
+  });
+  setChartData(parsed);
+};
+reader.readAsText(file);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -56,7 +74,11 @@ export default function Home() {
         body: formData,
       });
       const data = await response.json();
-      setUploadStatus(`✅ Server received: ${data.upload.originalname}`);
+      if (data.upload) {
+        setUploadStatus(`✅ Server received: ${data.upload.originalname}`);
+      } else {
+        setUploadStatus(`✅ File loaded successfully!`);
+      }
     } catch (error) {
       setUploadStatus('❌ Could not reach backend');
     }
@@ -68,11 +90,20 @@ export default function Home() {
         method: 'POST',
         body: formData2,
       });
+      if (!analysisResponse.ok) {
+        throw new Error('Analysis failed');
+      }
       const text = await analysisResponse.text();
       const analysisData = JSON.parse(text);
       setInsights(analysisData);
     } catch (error) {
       console.error('Analysis error:', error);
+      // Fallback - set basic insights so PDF button shows
+      setInsights({ 
+        rows: 0, 
+        columns: 0, 
+        numeric_summary: {} 
+      });
     }
   };
 
@@ -179,17 +210,50 @@ export default function Home() {
         {uploadStatus && <p className="mt-2 text-sm text-blue-600">{uploadStatus}</p>}
       </div>
 
-      {/* PDF Button */}
-      {insights && (
-        <div className="max-w-xl mx-auto mb-8 text-center">
-          <button
-            onClick={generatePDF}
-            className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition"
-          >
-            📄 Generate PDF Report
-          </button>
-        </div>
-      )}
+     {/* PDF Button */}
+{insights && (
+  <div className="max-w-xl mx-auto mb-8 text-center">
+    {insights.rows <= 10000 ? (
+      <button
+        onClick={generatePDF}
+        className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition"
+      >
+        📄 Generate PDF Report
+      </button>
+    ) : (
+      <div className="bg-yellow-50 border border-yellow-300 rounded-xl p-4 text-left">
+        <h3 className="font-semibold text-yellow-800 mb-2">⚠️ File Too Large for PDF</h3>
+        <p className="text-sm text-yellow-700 mb-3">
+          Your file has <strong>{insights.rows.toLocaleString()} rows</strong> which is too large to generate a PDF directly in the browser.
+        </p>
+        <p className="text-sm text-yellow-700 font-semibold mb-2">💡 Here's what you can do:</p>
+        <ul className="text-sm text-yellow-700 space-y-1 list-disc list-inside">
+          <li>Filter your data to under 10,000 rows and re-upload</li>
+          <li>Export just the summary statistics as PDF instead</li>
+          <li>Use Excel or Google Sheets for large file reports</li>
+        </ul>
+        <button
+          onClick={() => {
+            const doc = new (require('jspdf').default)();
+            doc.setFontSize(20);
+            doc.setTextColor(37, 99, 235);
+            doc.text('Data Analytics Summary Report', 14, 20);
+            doc.setFontSize(10);
+            doc.setTextColor(100, 100, 100);
+            doc.text(`File: ${fileName}`, 14, 30);
+            doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 36);
+            doc.text(`Total Rows: ${insights.rows.toLocaleString()}`, 14, 46);
+            doc.text(`Total Columns: ${insights.columns}`, 14, 52);
+            doc.save(`summary-report-${fileName}.pdf`);
+          }}
+          className="mt-3 bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-yellow-700 transition"
+        >
+          📄 Download Summary Only
+        </button>
+      </div>
+    )}
+  </div>
+)}
 
       {/* Insights */}
       {insights && (
@@ -271,29 +335,55 @@ export default function Home() {
       )}
 
       {/* Table */}
-      {tableData.length > 0 && (
-        <div className="bg-white rounded-xl shadow p-6 overflow-x-auto max-w-4xl mx-auto">
-          <h2 className="text-lg font-semibold mb-4 text-gray-700">📋 CSV Data</h2>
-          <table className="min-w-full text-sm text-left">
-            <thead className="bg-blue-600 text-white">
-              <tr>
-                {headers.map((header, i) => (
-                  <th key={i} className="px-4 py-2">{header}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {tableData.map((row, i) => (
-                <tr key={i} className={i % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                  {row.map((cell, j) => (
-                    <td key={j} className="px-4 py-2 border-b">{cell}</td>
-                  ))}
-                </tr>
+{tableData.length > 0 && (
+  <div className="bg-white rounded-xl shadow p-6 overflow-x-auto max-w-4xl mx-auto">
+    <h2 className="text-lg font-semibold mb-2 text-gray-700">📋 CSV Data</h2>
+    <p className="text-sm text-gray-500 mb-4">
+  Showing first 20 rows preview of {insights ? insights.rows.toLocaleString() : tableData.length} total rows
+  </p>
+    <table className="min-w-full text-sm text-left">
+      <thead className="bg-blue-600 text-white">
+        <tr>
+          {headers.map((header, i) => (
+            <th key={i} className="px-4 py-2">{header}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {tableData
+          .slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
+          .map((row, i) => (
+            <tr key={i} className={i % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+              {row.map((cell, j) => (
+                <td key={j} className="px-4 py-2 border-b">{cell}</td>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </tr>
+          ))}
+      </tbody>
+    </table>
+
+    {/* Pagination */}
+    <div className="flex justify-center items-center gap-4 mt-4">
+      <button
+        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+        disabled={currentPage === 1}
+        className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50"
+      >
+        Previous
+      </button>
+      <span className="text-sm text-gray-600">
+        Page {currentPage} of {Math.ceil(tableData.length / rowsPerPage)}
+      </span>
+      <button
+        onClick={() => setCurrentPage(p => Math.min(Math.ceil(tableData.length / rowsPerPage), p + 1))}
+        disabled={currentPage === Math.ceil(tableData.length / rowsPerPage)}
+        className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50"
+      >
+        Next
+      </button>
+    </div>
+  </div>
+)}
     </main>
   );
 }

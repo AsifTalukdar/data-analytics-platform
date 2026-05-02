@@ -10,7 +10,7 @@ export default function Login() {
         <p className="text-gray-500 mb-8">Sign in to upload and analyze your data</p>
 
         <button
-          onClick={() => signIn('google', { callbackUrl: 'http://localhost:3000' })}
+          onClick={() => signIn('google', { callbackUrl: 'http://localhost' })}
           className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 rounded-lg px-6 py-3 text-gray-700 font-medium hover:bg-gray-50 shadow-sm transition mb-4"
         >
           <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />

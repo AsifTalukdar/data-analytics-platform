@@ -7,7 +7,13 @@ const app = express();
 const PORT = 5000;
 app.use(cors());
 app.use(express.json());
-const pool = new Pool({ user: 'postgres', host: 'localhost', database: 'analytics_db', password: '', port: 5432 });
+const pool = new Pool({ 
+  user: process.env.DB_USER || 'postgres', 
+  host: process.env.DB_HOST || 'localhost', 
+  database: process.env.DB_NAME || 'analytics_db', 
+  password: process.env.DB_PASSWORD || '', 
+  port: process.env.DB_PORT || 5432 
+});
 pool.connect((err, client, release) => { if (err) { console.error('DB error:', err.message); } else { console.log('Connected to PostgreSQL!'); release(); } });
 const storage = multer.diskStorage({ destination: (req, file, cb) => cb(null, 'uploads/'), filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname) });
 const upload = multer({ storage });
